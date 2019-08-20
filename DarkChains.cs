@@ -12,14 +12,64 @@ namespace DarkChains
         public List<Item> darkChains = new List<Item>();
         public List<RagdollHandle> chainedParts = new List<RagdollHandle>();
 
+        public WaveSpawner waveSpawner;
+
+        public bool firstGrab;
 
         public override void OnLevelLoaded(LevelDefinition levelDefinition)
         {
             activeScript = true;
+            
         }
+
+        void OnWaveBegin()
+        {
+            ResetAll();
+        }
+
+
+        void CrateGrab(Interactor interactor, EventTime eventTime)
+        {
+            
+            if (interactor.nearestInteractable)
+            {
+                
+                Handle ragdollHandle = interactor.nearestInteractable as Handle;
+                if (ragdollHandle.item)
+                {
+                    
+                    ragdollHandle.item = null;
+                   
+
+                }
+
+            }             
+          }
+
+        void CrateUngrab(Interactor interactor, EventTime eventTime)
+        {
+            if (interactor.grabbedHandle)
+            {
+                interactor.grabbedHandle.item = Item.list[0];
+            }
+        }
+
 
         public override void Update(LevelDefinition levelDefinition)
         {
+
+            if(waveSpawner == null)
+            {
+                
+                if(WaveSpawner.local != null)
+                {
+                    waveSpawner = WaveSpawner.local;
+                    waveSpawner.OnWaveBeginEvent += OnWaveBegin;
+                    
+                }
+
+            }
+
 
             if (reseting)
             {
@@ -30,49 +80,8 @@ namespace DarkChains
             {
                 if(PlayerControl.handLeft.alternateUsePressed && PlayerControl.handLeft.usePressed && PlayerControl.handRight.alternateUsePressed && PlayerControl.handRight.usePressed)
                 {
-
-
-                    reseting = true;
-                    
-                    foreach (Item chain in darkChains)
-                    {
-                        if (chain != null)
-                        {
-                            Player.local.handLeft.bodyHand.telekinesis.TryRelease();
-                            Player.local.handRight.bodyHand.telekinesis.TryRelease();
-                            chain.GetComponent<ItemDarkChain>().isEnding = true;
-                            DestroySelf.Destroy(chain.gameObject);
-                        }
-
-                    }
-                    darkChains.Clear();
-
-                    foreach (RagdollHandle ragdollHandle in chainedParts)
-                    {
-                        if (ragdollHandle != null)
-                        {
-                            foreach (RagdollPart part in ragdollHandle.ragdollPart.ragdoll.parts)
-                            {
-                                part.rb.isKinematic = false;
-                            }
-
-                            /*if (ragdollHandle.ragdollPart.ragdoll.state != BS.Ragdoll.State.Dead)
-                            {
-                                ragdollHandle.ragdollPart.ragdoll.SetState(BS.Ragdoll.State.Fallen);
-                               
-                            }*/
-                            ragdollHandle.ragdollPart.ragdoll.allowStandUp = true;
-                            ragdollHandle.name = "NPC";
-                            ragdollHandle.ragdollPart.ragdoll.RefreshFall();
-                                
-                            ragdollHandle.tag = "Untagged";
-                            ragdollHandle.ragdollPart.ragdoll.creature.name = "UncheckedNPC";
-                        }
-
-                    }
-                    chainedParts.Clear();
-
-
+                    ResetAll();
+                                        
                 }
 
                 if (Creature.list.Count > 0)
@@ -91,13 +100,39 @@ namespace DarkChains
                                         {
                                             foreach (RagdollHandle ragdollHandle in part.handles)
                                             {
-                                                if (ragdollHandle.name == "HumanHeadSkull" || ragdollHandle.name == "HumanShoulder" || ragdollHandle.name == "NPC(chained)")
+                                                if (ragdollHandle.name == "HumanHeadSkull" || ragdollHandle.name == "HumanShoulder" || ragdollHandle.name == "NPC(chained)" || ragdollHandle.name == "NPC(neck)(chained)")
                                                 {
                                                     //Not looking good
                                                 }
                                                 else
                                                 {
-                                                    if(ragdollHandle.name == "HumanHeadNeck")
+
+
+                                                    if (ragdollHandle.name == "NPC(neck)" || ragdollHandle.name == "NPC")
+                                                    {
+
+                                                    }
+                                                    else
+                                                    {
+                                                        if(!ragdollHandle.item)
+                                                        {
+                                                            Debug.Log("Ragdoll handle didn't have an item attached");
+                                                            ragdollHandle.item = Item.list[0];
+
+                                                            ragdollHandle.Grabbed += CrateGrab;
+                                                            ragdollHandle.UnGrabbed += CrateUngrab;
+                                                            
+                                                            
+                                                            
+                                                            foreach (CatalogData.Localization name in ragdollHandle.item.data.displayNames)
+                                                            {
+                                                                name.text = "NPC";
+                                                            }
+                                                        }
+
+                                                    }
+
+                                                    if (ragdollHandle.name == "HumanHeadNeck" || ragdollHandle.name == "NPC(neck)")
                                                     {
                                                         ragdollHandle.name = "NPC(neck)";
                                                     }
@@ -107,9 +142,13 @@ namespace DarkChains
                                                     }
 
                                                     ragdollHandle.tag = "Untagged";
-                                                    
 
-                                                    ragdollHandle.item = Item.list[0];
+
+
+
+
+
+                                                    
                                                     
                                                 }
 
@@ -145,6 +184,94 @@ namespace DarkChains
         }
 
 
+        public void ResetAll()
+        {
+            reseting = true;
+
+            if (darkChains.Count > 0)
+            {
+                foreach (Item chain in darkChains)
+                {
+                    if (chain != null)
+                    {
+
+                        chain.GetComponent<ItemDarkChain>().isEnding = true;
+                        if (chain.GetComponent<ItemDarkChain>().myRagdollPart != null)
+                        {
+                            chain.GetComponent<ItemDarkChain>().myRagdollPart.rb.isKinematic = false;
+                        }
+
+                    }
+
+                }
+
+            }
+
+            if (chainedParts.Count > 0)
+            {
+                foreach (RagdollHandle ragdollHandle in chainedParts)
+                {
+                    
+                    if (ragdollHandle != null)
+                    {
+                        if (ragdollHandle.ragdollPart != null)
+                        {
+                            if (ragdollHandle.ragdollPart.ragdoll != null)
+                            {
+                                if (ragdollHandle.ragdollPart.ragdoll.parts.Count > 0)
+                                {
+                                    foreach (RagdollPart part in ragdollHandle.ragdollPart.ragdoll.parts)
+                                    {
+                                        part.rb.isKinematic = false;
+                                    }
+
+                                    ragdollHandle.ragdollPart.ragdoll.allowStandUp = true;
+                                    ragdollHandle.ragdollPart.ragdoll.RefreshFall();
+
+                                    if (ragdollHandle.name == "NPC(neck)(chained)")
+                                    {
+                                        ragdollHandle.name = "NPC(neck)";
+                                    }
+                                    else if (ragdollHandle.name == "NPC(chained)")
+                                    {
+                                        ragdollHandle.name = "NPC";
+                                    }
+                                    else
+                                    {
+                                        Debug.Log("The ragdollHandle was neither the neck nor a default part");
+                                    }
+                                    ragdollHandle.tag = "Untagged";
+                                    
+                                }
+                            }
+                        }
+                                                  
+                            
+                    }
+
+                }
+                chainedParts.Clear();
+            }
+
+            if (darkChains.Count > 0)
+            {
+                foreach (Item chain in darkChains)
+                {
+                    if (chain != null)
+                    {
+                        Player.local.handLeft.bodyHand.telekinesis.TryRelease();
+                        Player.local.handRight.bodyHand.telekinesis.TryRelease();
+                        chain.GetComponent<ItemDarkChain>().isEnding = true;
+                        DestroySelf.Destroy(chain.gameObject);
+                    }
+
+                }
+                darkChains.Clear();
+            }
+
+        }
+
+
         public void CheckTeleNPC(Telekinesis telekinesis)
         {
             if (telekinesis.catchedHandle != null)
@@ -157,43 +284,59 @@ namespace DarkChains
 
                         if (rdHandle.ragdollPart != null)
                         {
+                            Item chain = Catalog.current.GetData<ItemData>("DarkChain", true).Spawn(true);
                             
-                            if (rdHandle.ragdollPart.ragdoll.state != BS.Ragdoll.State.Dead || true)
+                            rdHandle.ragdollPart.ragdoll.allowStandUp = false;
+                            
+                            
+                            chainedParts.Add(rdHandle);
+                            darkChains.Add(chain);
+
+                            chain.transform.position = rdHandle.ragdollPart.transf.position;
+                            chain.transform.rotation = rdHandle.ragdollPart.transf.rotation;
+
+
+                            if(chain.gameObject != null)
                             {
-                                if (rdHandle.ragdollPart.ragdoll.state != BS.Ragdoll.State.Dead)
+                                if(chain.gameObject.GetComponent<ItemDarkChain>() != null)
                                 {
-                                    rdHandle.ragdollPart.ragdoll.SetState(BS.Ragdoll.State.Fallen);
+                                    chain.gameObject.GetComponent<ItemDarkChain>().myRagdollPart = rdHandle.ragdollPart;
+                                    chain.gameObject.GetComponent<ItemDarkChain>().ragdollHandle = rdHandle;
+                                    
                                 }
-
-                                Item chain = Catalog.current.GetData<ItemData>("DarkChain", true).Spawn(true);
-                                if(telekinesis.catchedHandle.name == "NPC(neck)")
-                                {
-                                    chain.gameObject.GetComponent<ItemDarkChain>().sliceable = false;
-                                }
-                                else
-                                {
-                                    chain.gameObject.GetComponent<ItemDarkChain>().sliceable = true;
-                                }
-                                rdHandle.ragdollPart.ragdoll.allowStandUp = false;
-                                //rdHandle.ragdollPart.rb.isKinematic = true;
-                                telekinesis.catchedHandle.name = "NPC(chained)";
-                                telekinesis.catchedHandle.tag = "IgnoreTK";
                                 
-
-
-                                chainedParts.Add(rdHandle);
-                                darkChains.Add(chain);
-                                chain.transform.position = rdHandle.ragdollPart.transf.position;
-                                chain.transform.rotation = rdHandle.ragdollPart.transf.rotation;
-                                chain.gameObject.GetComponent<ItemDarkChain>().myRagdollPart = rdHandle.ragdollPart;
-                                chain.gameObject.GetComponent<ItemDarkChain>().ragdollHandle = rdHandle;
-                                
-
-                                telekinesis.TryRelease();
-                                telekinesis.targetHandle = chain.mainHandleRight;
-                                telekinesis.TryCatch();
-
                             }
+                            
+
+                            if (telekinesis.catchedHandle.name == "NPC(neck)")
+                            {
+                                chain.gameObject.GetComponent<ItemDarkChain>().sliceable = false;
+                                chain.gameObject.GetComponent<ItemDarkChain>().neck = true;
+                                telekinesis.catchedHandle.name = "NPC(neck)(chained)";
+                            }
+                            else
+                            {
+                                chain.gameObject.GetComponent<ItemDarkChain>().sliceable = true;
+                                chain.gameObject.GetComponent<ItemDarkChain>().neck = false;
+                                telekinesis.catchedHandle.name = "NPC(chained)";
+                            }
+
+                            if (rdHandle.ragdollPart.ragdoll.state != BS.Ragdoll.State.Dead)
+                            {
+                                rdHandle.ragdollPart.ragdoll.SetState(BS.Ragdoll.State.Fallen);
+                            }
+
+                            chain.gameObject.GetComponent<ItemDarkChain>().Initialize();
+
+                            Debug.Log("Catched handle name: " + telekinesis.catchedHandle.name);
+                            
+                            telekinesis.catchedHandle.tag = "IgnoreTK";
+
+                            telekinesis.TryRelease();
+                            telekinesis.targetHandle = chain.mainHandleRight;
+                            telekinesis.TryCatch();
+
+                            
                         }
 
 
@@ -202,17 +345,28 @@ namespace DarkChains
             }
         }
      
-        public static void DarkChainDestroy(Item chain, RagdollPart ragdollPart, RagdollHandle ragdollHandle, Telekinesis telekinesis)
+        public static void DarkChainDestroy(Item chain, RagdollPart ragdollPart, RagdollHandle ragdollHandle, Telekinesis telekinesis, bool neck)
         {
-
             telekinesis.TryRelease();
-            telekinesis.other.TryRelease();
+
             DestroySelf.Destroy(chain.gameObject);
 
-            foreach (RagdollPart part in ragdollPart.ragdoll.parts)
+            if(ragdollPart.ragdoll.parts.Count > 0)
             {
-                part.rb.isKinematic = false;
+                foreach (RagdollPart part in ragdollPart.ragdoll.parts)
+                {
+                    part.rb.isKinematic = false;
+                }
             }
+            
+            if(ragdollHandle.ragdollPart.ragdoll.parts.Count > 0)
+            {
+                foreach (RagdollPart part in ragdollHandle.ragdollPart.ragdoll.parts)
+                {
+                    part.rb.isKinematic = false;
+                }
+            }
+
 
             ragdollPart.ragdoll.SetState(BS.Ragdoll.State.Fallen);
             if(ragdollPart.ragdoll.creature.health.currentHealth <= 0)
@@ -221,12 +375,62 @@ namespace DarkChains
             }
 
 
-            ragdollHandle.name = "NPC";
-            ragdollPart.ragdoll.RefreshFall();
+            if (ragdollHandle.name == "NPC(neck)(chained)")
+            {
+                ragdollHandle.name = "NPC(neck)";
+            }
+            else if (ragdollHandle.name == "NPC(chained)")
+            {
+                ragdollHandle.name = "NPC";
+            }
+            else
+            {
+                Debug.Log("The ragdollHandle was neither the neck nor a default part");
+            }
+            //ragdollPart.ragdoll.RefreshFall();
             ragdollPart.ragdoll.allowStandUp = true;
             ragdollHandle.tag = "Untagged";
-            ragdollPart.ragdoll.creature.name = "UncheckedNPC";
 
+        }
+
+        public static void DarkChainDestroy(Item chain, RagdollPart ragdollPart, RagdollHandle ragdollHandle, bool neck)
+        {
+
+            DestroySelf.Destroy(chain.gameObject);
+
+            if (ragdollPart.ragdoll.parts.Count > 0)
+            {
+                foreach (RagdollPart part in ragdollPart.ragdoll.parts)
+                {
+                    part.rb.isKinematic = false;
+                }
+            }
+
+            if (ragdollHandle.ragdollPart.ragdoll.parts.Count > 0)
+            {
+                foreach (RagdollPart part in ragdollHandle.ragdollPart.ragdoll.parts)
+                {
+                    part.rb.isKinematic = false;
+                }
+            }
+
+
+            if (ragdollHandle.name == "NPC(neck)(chained)")
+            {
+                ragdollHandle.name = "NPC(neck)";
+            }
+            else if (ragdollHandle.name == "NPC(chained)")
+            {
+                ragdollHandle.name = "NPC";
+            }
+            else
+            {
+                Debug.Log("The ragdollHandle was neither the neck nor a default part");
+            }
+
+            //ragdollPart.ragdoll.RefreshFall();
+            ragdollPart.ragdoll.allowStandUp = true;
+            ragdollHandle.tag = "Untagged";
 
         }
         public override void OnLevelUnloaded(LevelDefinition levelDefinition)
